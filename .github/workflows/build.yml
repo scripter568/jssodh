@@ -1,0 +1,35 @@
+name: Build Android Geode mod
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl unzip zip ninja-build cmake clang
+
+      - name: Install Geode CLI
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/geode-sdk/cli/main/install.sh | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Install Android64 binaries
+        run: geode sdk install-binaries -p android64
+
+      - name: Build package
+        run: geode build -p android64
+
+      - name: Upload .geode package
+        uses: actions/upload-artifact@v4
+        with:
+          name: stereo-madness-welcome-android64
+          path: '**/*.geode'
