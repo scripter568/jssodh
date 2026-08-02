@@ -3,36 +3,64 @@ name: Build Android Geode mod
 on:
   workflow_dispatch:
   push:
-    branches: [ main ]
+    branches:
+      - main
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout
+      - name: Download project
         uses: actions/checkout@v4
 
       - name: Install build tools
+        shell: bash
         run: |
+          set -e
           sudo apt-get update
           sudo apt-get install -y curl unzip zip ninja-build cmake clang
 
       - name: Install Geode CLI
+        shell: bash
         run: |
-          curl -L -o geode-cli.zip https://github.com/geode-sdk/cli/releases/download/v3.8.0/geode-cli-v3.8.0-linux.zip
+          set -e
+
+          mkdir -p "$HOME/.local/bin"
+
+          curl -fL --retry 5 \
+            -o geode-cli.zip \
+            https://github.com/geode-sdk/cli/releases/download/v3.8.0/geode-cli-v3.8.0-linux.zip
+
           unzip -o geode-cli.zip -d "$HOME/.local/bin"
+
           chmod +x "$HOME/.local/bin/geode"
+
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
           "$HOME/.local/bin/geode" --version
 
-      - name: Install Android64 binaries
-        run: geode sdk install-binaries -p android64
+      - name: Install Android64 Geode SDK binaries
+        shell: bash
+        run: |
+          set -e
+          geode sdk install-binaries -p android64
 
-      - name: Build package
-        run: geode build -p android64
+      - name: Build Android64 mod
+        shell: bash
+        run: |
+          set -e
+          geode build -p android64
 
-      - name: Upload .geode package
+      - name: Find Geode package
+        shell: bash
+        run: |
+          set -e
+          find . -type f -name "*.geode" -print
+
+      - name: Upload Geode package
         uses: actions/upload-artifact@v4
         with:
           name: stereo-madness-welcome-android64
-          path: '**/*.geode'
+          path: "**/*.geode"
+          if-no-files-found: error
