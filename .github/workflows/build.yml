@@ -11,56 +11,90 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download project
+      - name: Checkout project
         uses: actions/checkout@v4
 
-      - name: Install build tools
-        shell: bash
+      - name: Install system dependencies
         run: |
-          set -e
+          set -eux
           sudo apt-get update
-          sudo apt-get install -y curl unzip zip ninja-build cmake clang
+          sudo apt-get install -y \
+            curl \
+            unzip \
+            zip \
+            jq \
+            ninja-build \
+            cmake \
+            clang
 
       - name: Install Geode CLI
+        uses: geode-sdk/cli/.github/actions/setup@main
+        with:
+          version: v3.8.0
+
+      - name: Check Geode CLI
+        run: |
+          set -eux
+          geode --version
+          geode --help
+
+      - name: Create temporary Geode profile
         shell: bash
         run: |
-          set -e
+          set -eux
 
-          mkdir -p "$HOME/.local/bin"
+          export CLI_PROFILE="$GITHUB_WORKSPACE/cli-profile"
 
-          curl -fL --retry 5 \
-            -o geode-cli.zip \
-            https://github.com/geode-sdk/cli/releases/download/v3.8.0/geode-cli-v3.8.0-linux.zip
+          mkdir -p "$CLI_PROFILE/geode/mods"
+          mkdir -p "$CLI_PROFILE/Contents/geode/mods"
 
-          unzip -o geode-cli.zip -d "$HOME/.local/bin"
+          geode profile add \
+            --name GithubActions \
+            "$CLI_PROFILE/GeometryDash.exe" \
+            android64
 
-          chmod +x "$HOME/.local/bin/geode"
-
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-
-          "$HOME/.local/bin/geode" --version
-
-      - name: Install Android64 Geode SDK binaries
+      - name: Install Geode SDK
         shell: bash
         run: |
-          set -e
-          geode sdk install-binaries -p android64
+          set -eux
 
-      - name: Build Android64 mod
+          export GEODE_SDK="$GITHUB_WORKSPACE/geode-sdk"
+          echo "GEODE_SDK=$GEODE_SDK" >> "$GITHUB_ENV"
+
+          geode sdk install "$GEODE_SDK"
+
+      - name: Install Android64 Geode binaries
         shell: bash
         run: |
-          set -e
-          geode build -p android64
+          set -eux
 
-      - name: Find Geode package
+          geode sdk install-binaries \
+            --platform android64
+
+      - name: Build mod
         shell: bash
         run: |
-          set -e
-          find . -type f -name "*.geode" -print
+          set -eux
+
+          geode build \
+            --platform android64 \
+            --config Release
+
+      - name: Show generated files
+        shell: bash
+        run: |
+          set -eux
+          find "$GITHUB_WORKSPACE" \
+            -type f \
+            \( -name "*.geode" -o -name "*.zip" \) \
+            -print
 
       - name: Upload Geode package
         uses: actions/upload-artifact@v4
         with:
           name: stereo-madness-welcome-android64
-          path: "**/*.geode"
+          path: |
+            **/*.geode
+            **/dist/*.geode
+            **/build/**/*.geode
           if-no-files-found: error
